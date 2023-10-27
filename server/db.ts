@@ -1,11 +1,14 @@
-import { Pool } from 'pg';
+import dotenv from 'dotenv';
+import { Pool, QueryConfig, QueryResult } from 'pg';
+
+dotenv.config();
 
 const pool = new Pool({
-    user: 'your_username',
-    host: 'localhost',
-    database: 'your_database_name',
-    password: 'your_password',
-    port: 5432,
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASS,
+    port: parseInt(process.env.DB_PORT || '5432'),
 });
 
-export default pool;
+export const query = (text: string, params?: QueryConfig['values']) => pool.query(text, params) as Promise<QueryResult<Record<string, unknown>>>;
