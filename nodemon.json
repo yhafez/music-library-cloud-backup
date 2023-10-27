@@ -1,0 +1,9 @@
+{
+	"watch": ["server"],
+	"ext": "ts,js",
+	"exec": "ts-node ./server/index.ts",
+	"ignore": ["server/**/*.spec.ts"],
+	"env": {
+		"NODE_ENV": "development"
+	}
+}

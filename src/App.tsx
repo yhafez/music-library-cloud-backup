@@ -1,9 +1,15 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
+import axios from 'axios'
+import { useEffect, useState } from 'react'
+
 import './App.css'
+import reactLogo from './assets/react.svg'
 
 function App() {
 	const [count, setCount] = useState(0)
+
+	useEffect(() => {
+		axios.get('/api').then(res => console.log(res))
+	}, [])
 
 	return (
 		<div className="App">
