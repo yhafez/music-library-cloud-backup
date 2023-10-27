@@ -1,6 +1,6 @@
-# fs-vite-scaffold
+# music-library-cloud-backup
 
-Boilerplate for starting a vite-based front-end with a focus on React. This scaffold is designed to provide a robust starting point for both simple and complex front-end applications.
+A Vite and React-based application for securely backing up your local music library to an AWS S3 bucket. This full-stack solution is designed to provide an easy and efficient way to ensure your music collection is safely stored in the cloud.
 
 ## Features
 
