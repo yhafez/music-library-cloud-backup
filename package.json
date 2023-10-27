@@ -1,5 +1,5 @@
 {
-	"name": "fs-vite-scaffold",
+	"name": "music-library-cloud-backup",
 	"version": "1.0.0",
 	"author": {
 		"name": "Yahya Hafez",
@@ -14,14 +14,14 @@
 		}
 	],
 	"private": true,
-	"description": "Boilerplate for starting a vite-based front-end",
+	"description": "An application that allows me to backup my music library to the cloud",
 	"bugs": {
-		"url": "https://github.com/yhafez/fs-vite-scaffold/issues",
+		"url": "https://github.com/yhafez/music-library-cloud-backup/issues",
 		"email": "yhafez3@gmail.com"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/yhafez/fs-vite-scaffold.git"
+		"url": "https://github.com/yhafez/music-library-cloud-backup.git"
 	},
 	"engines": {
 		"pnpm": ">=7.13.6",
