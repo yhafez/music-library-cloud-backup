@@ -1,9 +1,10 @@
 import { DeleteObjectCommand, ListObjectsV2Command, PutObjectCommand, S3 } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 
 import { AppError, errorHandler } from './middleware/error-handler';
+import { errorValidateFileName, validateFileName } from './middleware/validation';
 import loadSqlQuery from './utils/loadSqlQuery';
 
 import { query } from './db';
@@ -35,7 +36,7 @@ router.get('/health', (req, res) => {
     res.send('Hello from the API!');
 });
 
-router.get('/s3/songs/list', async (req, res, next) => {
+router.get('/s3/songs/list', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const command = new ListObjectsV2Command({
             Bucket: bucketName,
@@ -51,7 +52,7 @@ router.get('/s3/songs/list', async (req, res, next) => {
     }
 });
 
-router.post('/songs/s3/upload', upload.single('file'), async (req, res, next) => {
+router.post('/songs/s3/upload', [upload.single('file'), ...validateFileName, errorValidateFileName], async (req: Request, res: Response, next: NextFunction) => {
     if (!req.file) {
         return res.status(400).send('No file uploaded.');
     }
@@ -93,7 +94,10 @@ router.post('/songs/s3/upload', upload.single('file'), async (req, res, next) =>
     }
 });
 
-router.delete('/songs/s3/delete', async (req, res, next) => {
+router.delete('/songs/s3/delete', [
+    ...validateFileName,
+    errorValidateFileName,
+], async (req: Request, res: Response, next: NextFunction) => {
     const { fileName } = req.body;
     try {
         // Delete from database
@@ -123,7 +127,7 @@ router.delete('/songs/s3/delete', async (req, res, next) => {
     }
 })
 
-router.get('/songs/db/list', async (req, res, next) => {
+router.get('/songs/db/list', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const result = await query(loadSqlQuery('select-songs.sql'));
         res.json(result.rows);
