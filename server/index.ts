@@ -2,7 +2,9 @@ import { DeleteObjectCommand, ListObjectsV2Command, PutObjectCommand, S3 } from 
 import dotenv from 'dotenv';
 import express from 'express';
 import multer from 'multer';
+
 import { AppError, errorHandler } from './middleware/error-handler';
+import loadSqlQuery from './utils/loadSqlQuery';
 
 import { query } from './db';
 
@@ -65,7 +67,7 @@ router.post('/songs/s3/upload', upload.single('file'), async (req, res, next) =>
         });
 
         // Save to database
-        const dbResult = await query('INSERT INTO songs (filename) VALUES ($1)', [fileName]);
+        const dbResult = await query(loadSqlQuery('insert-song.sql'), [fileName]);
         if (dbResult.rowCount !== 1) {
             next(
                 new AppError(
@@ -95,7 +97,7 @@ router.delete('/songs/s3/delete', async (req, res, next) => {
     const { fileName } = req.body;
     try {
         // Delete from database
-        const dbResult = await query('DELETE FROM songs WHERE filename = $1', [fileName]);
+        const dbResult = await query(loadSqlQuery('delete-song.sql'), [fileName]);
         if (dbResult.rowCount !== 1) {
             next(
                 new AppError(
@@ -123,7 +125,7 @@ router.delete('/songs/s3/delete', async (req, res, next) => {
 
 router.get('/songs/db/list', async (req, res, next) => {
     try {
-        const result = await query('SELECT * FROM songs');
+        const result = await query(loadSqlQuery('select-songs.sql'));
         res.json(result.rows);
     } catch (err) {
         next(
