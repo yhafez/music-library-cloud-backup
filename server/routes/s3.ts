@@ -1,5 +1,6 @@
 import {
 	DeleteObjectCommand,
+	DeleteObjectCommandOutput,
 	ListObjectsV2Command,
 	PutObjectCommand,
 	PutObjectCommandOutput,
@@ -23,15 +24,22 @@ const s3Router = Router()
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
-s3Router.get('/list', async (req: Request, res: Response, next: NextFunction) => {
+s3Router.get('/list', async (_req: Request, res: Response, next: NextFunction) => {
+	const command = new ListObjectsV2Command({
+		Bucket: bucketName,
+	})
+
 	try {
-		const command = new ListObjectsV2Command({
-			Bucket: bucketName,
-		})
 		const result = await s3.send(command)
-		res.json(result.Contents)
+		if (result.$metadata.httpStatusCode !== 200) {
+			return next(
+				new AppError(`Failed to retrieve objects from S3`, result.$metadata.httpStatusCode),
+			)
+		}
+
+		return res.json(result.Contents)
 	} catch (err) {
-		next(new AppError(`Failed to retrieve objects from S3`, 500))
+		return next(new AppError(`Failed to retrieve objects from S3`, 500))
 	}
 })
 
@@ -39,15 +47,18 @@ s3Router.post(
 	'/upload',
 	[upload.single('file'), ...validateFileName, errorValidateFileName],
 	async (req: Request, res: Response, next: NextFunction) => {
+		// Confirm file was uploaded
 		if (!req.file) return res.status(400).send('No file uploaded.')
 		const fileName = req.file.originalname
 		const fileContent = req.file.buffer
 
+		// Check if file already exists
 		const fileExistsError = await getFileByName(fileName)
 		if (fileExistsError instanceof AppError) {
 			return next(fileExistsError)
 		}
 
+		// Get metadata from file
 		let metadata: Metadata
 		try {
 			metadata = await getMetadata(fileName, fileContent, req.file.mimetype)
@@ -55,8 +66,11 @@ s3Router.post(
 			return next(new AppError(`Failed to parse metadata`, 500, err))
 		}
 
+		// Begin database transaction to save file
 		let dbResult: QueryResult<Song>
 		try {
+			await query('BEGIN')
+
 			dbResult = await query(loadSqlQuery('insert-song.sql'), [fileName, metadata])
 			// If database insert fails, rollback transaction and handle error
 			if (dbResult?.rowCount !== 1) {
@@ -67,6 +81,7 @@ s3Router.post(
 			return next(new AppError(`Failed to save song to database`, 500, err))
 		}
 
+		// Save to S3
 		const command = new PutObjectCommand({
 			Bucket: bucketName,
 			Key: dbResult.rows[0].id.toString(),
@@ -76,7 +91,6 @@ s3Router.post(
 
 		let s3Result: PutObjectCommandOutput
 		try {
-			// Save to S3
 			s3Result = await s3.send(command)
 			// If S3 upload fails, rollback transaction and handle error
 			if (s3Result.$metadata.httpStatusCode !== 200) {
@@ -84,7 +98,7 @@ s3Router.post(
 				return next(new AppError(`Failed to upload file to S3`, s3Result.$metadata.httpStatusCode))
 			}
 		} catch (err) {
-			// Rollback transaction if it's still open
+			// If S3 upload fails, rollback transaction if still open and handle error
 			try {
 				await query('ROLLBACK')
 			} catch (rollbackError) {
@@ -96,9 +110,9 @@ s3Router.post(
 		try {
 			// Commit database transaction
 			await query('COMMIT')
-			res.json(s3Result)
+			return res.json(s3Result)
 		} catch (err) {
-			// Rollback transaction if it's still open
+			// If commit fails, rollback transaction if still open and handle error
 			try {
 				await query('ROLLBACK')
 			} catch (rollbackError) {
@@ -112,50 +126,70 @@ s3Router.post(
 s3Router.delete('/delete/:id', async (req: Request, res: Response, next: NextFunction) => {
 	const { id } = req.params
 
+	// Check if file exists
 	const fileDoesNotExistError = await getFileById(id)
 	if (fileDoesNotExistError instanceof AppError) {
 		return next(fileDoesNotExistError)
 	}
 
+	// Begin database transaction to delete song
 	try {
-		// Begin database transaction
 		await query('BEGIN')
 
-		// Delete from database
 		const dbResult = await query(loadSqlQuery('delete-song.sql'), [id])
 		// If database delete fails, rollback transaction and handle error
 		if (dbResult?.rowCount !== 1) {
 			await query('ROLLBACK')
-			next(new AppError(`Failed to delete song from database`, 500))
+			return next(new AppError(`Failed to delete song from database`, 500))
 		}
-
-		// Delete from S3
-		const command = new DeleteObjectCommand({
-			Bucket: bucketName,
-			Key: id,
-		})
-		const result = await s3.send(command)
-
-		// If S3 delete fails, rollback transaction and handle error
-		if (result.$metadata.httpStatusCode !== 204) {
-			await query('ROLLBACK')
-			next(new AppError(`Failed to delete object from S3`, result.$metadata.httpStatusCode))
-		}
-
-		// Commit database transaction
-		await query('COMMIT')
-
-		// Return result
-		res.json(result)
 	} catch (err) {
-		// Rollback transaction if it's still open
+		// If database delete fails, rollback transaction if still open and handle error
 		try {
 			await query('ROLLBACK')
 		} catch (rollbackError) {
 			console.error('Rollback Error:', rollbackError)
 		}
+		return next(new AppError(`Failed to delete song from database`, 500, err))
+	}
 
-		next(new AppError(`Failed to delete object from S3`, 500))
+	// Delete from S3
+	const command = new DeleteObjectCommand({
+		Bucket: bucketName,
+		Key: id,
+	})
+	let s3Result: DeleteObjectCommandOutput
+	try {
+		s3Result = await s3.send(command)
+
+		// If S3 delete fails, rollback transaction and handle error
+		if (s3Result.$metadata.httpStatusCode !== 204) {
+			await query('ROLLBACK')
+			return next(
+				new AppError(`Failed to delete object from S3`, s3Result.$metadata.httpStatusCode),
+			)
+		}
+	} catch (err) {
+		// If S3 delete fails, rollback transaction if still open and handle error
+		try {
+			await query('ROLLBACK')
+		} catch (rollbackError) {
+			console.error('Rollback Error:', rollbackError)
+		}
+		return next(new AppError(`Failed to delete object from S3`, 500, err))
+	}
+
+	try {
+		// Commit database transaction
+		await query('COMMIT')
+		return res.json(s3Result)
+	} catch (err) {
+		// If commit fails, rollback transaction if still open and handle error
+		try {
+			await query('ROLLBACK')
+		} catch (rollbackError) {
+			console.error('Rollback Error:', rollbackError)
+		}
+		return next(new AppError(`Failed to commit transaction`, 500, err))
 	}
 })
 
