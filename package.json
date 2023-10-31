@@ -27,13 +27,14 @@
 		"pnpm": ">=7.13.6",
 		"node": ">=18.17.1"
 	},
-	"main": "src/index.tsx",
+	"type": "module",
+	"exports": "./dist/index.js",
 	"typings": "src/vite-env.d.ts",
 	"scripts": {
 		"start": "vite --port $PORT",
 		"dev": "vite",
+		"start:backend": "nodemon --inspect server/index.ts",
 		"start:dev": "concurrently \"pnpm run dev\" \"pnpm run start:backend\"",
-		"start:backend": "nodemon",
 		"build": "vite build",
 		"preview": "vite preview",
 		"test": "NODE_ENV=test jest",
@@ -52,6 +53,7 @@
 		"express": "^4.18.2",
 		"express-validator": "^7.0.1",
 		"multer": "1.4.5-lts.1",
+		"music-metadata": "^8.1.4",
 		"pg": "^8.11.3",
 		"react": "^18.2.0",
 		"react-dom": "^18.2.0",
@@ -100,6 +102,8 @@
 		"nodemon": "^3.0.1",
 		"prettier": "^2.8.8",
 		"ts-node": "^10.9.1",
+		"tsc-watch": "^6.0.4",
+		"tsconfig-paths": "^4.2.0",
 		"typescript": "^4.9.5"
 	},
 	"lint-staged": {

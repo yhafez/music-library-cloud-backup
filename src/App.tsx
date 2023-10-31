@@ -1,36 +1,105 @@
-import axios from 'axios'
-import { useEffect, useState } from 'react'
+import axios from 'axios';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
-import './App.css'
-import reactLogo from './assets/react.svg'
+import './App.css';
 
-function App() {
-	const [count, setCount] = useState(0)
-
-	useEffect(() => {
-		axios.get('/api').then(res => console.log(res))
-	}, [])
-
-	return (
-		<div className="App">
-			<div>
-				<a href="https://vitejs.dev" target="_blank" rel="noreferrer">
-					<img src={reactLogo} className="logo react" alt="React logo" />
-				</a>
-				<a href="https://reactjs.org" target="_blank" rel="noreferrer">
-					<img src={reactLogo} className="logo react" alt="React logo" />
-				</a>
-			</div>
-			<h1>Vite + React</h1>
-			<div className="card">
-				<button onClick={() => setCount(count => count + 1)}>count is {count}</button>
-				<p>
-					Edit <code>src/App.tsx</code> and save to test HMR
-				</p>
-			</div>
-			<p className="read-the-docs">Click on the Vite and React logos to learn more</p>
-		</div>
-	)
+export interface Song {
+	id: number;
+	filename: string;
+	metadata: any;
 }
 
-export default App
+function App() {
+	const [songs, setSongs] = useState<Song[]>([]);
+	const [file, setFile] = useState<File | null>(null);
+	const [fetchError, setFetchError] = useState<string | null>(null);
+	const [uploadError, setUploadError] = useState<string | null>(null);
+
+	const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+	useEffect(() => {
+		// Fetch the list of songs from your API on component mount
+		axios.get('/api/songs/db/list')
+			.then((response) => {
+				setFetchError(null);
+				setSongs(response.data);
+			})
+			.catch((error) => {
+				console.error('Error fetching songs:', error);
+				setFetchError('Error fetching songs');
+			});
+	}, []);
+
+	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+		if (!e.target.files) return console.error('No files selected');
+		const selectedFile = e.target.files[0];
+		setFile(selectedFile);
+	};
+
+	const handleUpload = async () => {
+		if (!file) {
+			// Trigger file input click event to allow user to select a file
+			if (fileInputRef.current) {
+				fileInputRef.current.click();
+			}
+		}
+
+		// Create a FormData object to send the file to the server
+		const formData = new FormData();
+		if (!file) return console.error('No file selected');
+		formData.append('file', file);
+
+
+		try {
+			setUploadError(null);
+
+			// Upload the file to the server
+			await axios.post('/api/songs/s3/upload', formData, {
+				headers: {
+					'Content-Type': 'multipart/form-data',
+				},
+			});
+
+			// Refresh the list of songs
+			const response = await axios.get('/api/songs/db/list');
+			setSongs(response.data);
+
+			// Clear the selected file
+			setFile(null);
+		} catch (error) {
+			console.error('Error uploading file:', error);
+			setUploadError('Error uploading file');
+		}
+	};
+
+	console.log('songs:', songs);
+	return (
+		<div className="App">
+			<h1>Music Library Cloud Backup</h1>
+			<div>
+				<input
+					type="file"
+					onChange={handleFileChange}
+					ref={fileInputRef}
+					style={{ display: 'none' }}
+				/>
+				<button onClick={handleUpload}>Upload</button>
+				{uploadError && <p>{uploadError}</p>}
+			</div>
+			<div>
+				<h2>My Songs</h2>
+				{fetchError ? <p>{fetchError}</p> :
+					songs.length > 0 ? <p>{songs.length} songs found.</p>
+						: <p>No songs found.</p>
+				}
+				<ul>
+					{songs.map((song) => (
+						<li key={song.id}>{song.filename}</li>
+					))}
+				</ul>
+			</div>
+		</div>
+	);
+}
+
+export default App;

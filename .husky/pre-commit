@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+if git diff --cached --name-only | xargs grep -E 'console\.log\('; then
+  echo "Error: Found console.log statements in staged files. Please remove them before committing."
+  exit 1
+fi
+
 pnpm lint-staged && pnpm type-check && pnpm test && git add .

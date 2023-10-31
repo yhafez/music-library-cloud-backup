@@ -6,7 +6,7 @@ const validateFileName: RequestHandler[] = [
     // Validation and sanitization rules for the 'fileName' field
     (req: Request, res: Response, next: NextFunction) => {
         // Perform validation and sanitization here...
-        req.body.fileName = sanitizeFilename(req.body.fileName);
+        req.body.fileName = sanitizeFilename(req.file?.originalname || '');
 
         // Continue to the next middleware
         next();

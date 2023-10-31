@@ -12,19 +12,18 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 // S3 client
-export const s3 = new S3({ region: 'us-east-1' });
+export const s3 = new S3({ region: 'us-west-1' });
 export const bucketName = process.env.S3_BUCKET_NAME;
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Centralized Error Handling Middleware
 app.use(errorHandler);
 
 app.use('/api/songs', songsRouter);
 
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
     res.send('Hello from the API!');
 });
 
