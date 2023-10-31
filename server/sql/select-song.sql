@@ -1,1 +1,0 @@
-SELECT id FROM songs WHERE filename = $1;

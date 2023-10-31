@@ -1,5 +1,6 @@
 import dotenv from 'dotenv'
 import pg, { QueryConfig, QueryResult } from 'pg'
+import { Song } from '../types'
 const { Pool } = pg
 
 dotenv.config()
@@ -14,7 +15,7 @@ const pool = new Pool({
 
 export const query = async (text: string, params?: QueryConfig['values']) => {
 	try {
-		return (await pool.query(text, params)) as QueryResult<Record<string, unknown>>
+		return (await pool.query(text, params)) as QueryResult<Song>
 	} catch (err) {
 		console.error('Error executing query:', err)
 		throw err

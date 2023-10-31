@@ -1,1 +1,1 @@
-INSERT INTO songs (filename) VALUES ($1);
+INSERT INTO songs (filename, metadata) VALUES ($1, $2);

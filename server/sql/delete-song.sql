@@ -1,1 +1,1 @@
-DELETE FROM songs WHERE filename = $1
+DELETE FROM songs WHERE id = $1
