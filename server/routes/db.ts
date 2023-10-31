@@ -1,7 +1,10 @@
 import { NextFunction, Request, Response, Router } from 'express'
 import multer from 'multer'
 
-import { Metadata } from '../../types'
+import { GetObjectCommand, ListObjectsV2Command, ListObjectsV2Output } from '@aws-sdk/client-s3'
+import { QueryResult } from 'pg'
+import { bucketName, s3 } from '..'
+import { Metadata, Song } from '../../types'
 import { query } from '../db'
 import { AppError } from '../middleware/error-handler'
 import { errorValidateFileName, validateFileName } from '../middleware/validation'
@@ -15,7 +18,7 @@ const dbRouter = Router()
 const storage = multer.memoryStorage()
 export const upload = multer({ storage: storage })
 
-dbRouter.get('/list', async (req: Request, res: Response, next: NextFunction) => {
+dbRouter.get('/list', async (_req: Request, res: Response, next: NextFunction) => {
 	try {
 		const result = await query(loadSqlQuery('select-songs.sql'))
 		if (!result) {
@@ -87,59 +90,99 @@ dbRouter.delete('/delete/:id', async (req: Request, res: Response, next: NextFun
 	}
 })
 
-// dbRouter.get('/sync', async (req: Request, res: Response, next: NextFunction) => {
-// 	let s3Result: ListObjectsV2Output
-// 	try {
-// 		const command = new ListObjectsV2Command({
-// 			Bucket: bucketName,
-// 		})
-// 		s3Result = await s3.send(command)
-// 	} catch (err) {
-// 		if (err instanceof Error) {
-// 			return next(new AppError(`Failed to retrieve objects from S3`, 500, err))
-// 		}
-// 		return next(new AppError(`Failed to retrieve objects from S3`, 500))
-// 	}
+dbRouter.get('/sync', async (_req: Request, res: Response, next: NextFunction) => {
+	const command = new ListObjectsV2Command({
+		Bucket: bucketName,
+	})
+	let s3Result: ListObjectsV2Output
+	try {
+		s3Result = await s3.send(command)
+	} catch (err) {
+		if (err instanceof Error) {
+			return next(new AppError(`Failed to retrieve objects from S3`, 500, err))
+		}
+		return next(new AppError(`Failed to retrieve objects from S3`, 500))
+	}
 
-// 	let dbResult: QueryResult<Song>
-// 	try {
-// 		dbResult = await query(loadSqlQuery('select-songs.sql'))
-// 	} catch (err) {
-// 		if (err instanceof Error) {
-// 			return next(new AppError(`Failed to retrieve songs from database`, 500, err))
-// 		}
-// 		return next(new AppError(`Failed to retrieve songs from database`, 500))
-// 	}
+	let dbResult: QueryResult<Song>
+	try {
+		dbResult = await query(loadSqlQuery('select-songs.sql'))
+	} catch (err) {
+		if (err instanceof Error) {
+			return next(new AppError(`Failed to retrieve songs from database`, 500, err))
+		}
+		return next(new AppError(`Failed to retrieve songs from database`, 500))
+	}
 
-// 	const dbSongs = dbResult.rows.map(row => row.filename)
-// 	const s3Songs =
-// 		s3Result.Contents?.map(content => content.Key).filter(
-// 			(key): key is string => typeof key === 'string',
-// 		) || []
+	const dbSongIds = dbResult.rows.map(row => row.id)
+	const s3SongIds =
+		(s3Result.Contents?.map(object => object.Key).filter(key => key !== undefined) as string[]) ??
+		[]
 
-// 	const songsToAdd = s3Songs.filter(song => !dbSongs.includes(song))
-// 	const songsToDelete = dbSongs.filter(song => !s3Songs.includes(song))
+	const songsToAdd = s3SongIds.filter(id => !dbSongIds.includes(+id))
+	const songsToDelete = dbSongIds.filter(id => !s3SongIds.includes(id.toString()))
 
-// 	await query('BEGIN')
+	try {
+		await query('BEGIN')
+	} catch (err) {
+		next(new AppError(`Failed to begin transaction`, 500, err))
+	}
 
-// 	for (const song of songsToAdd) {
-// 		const { dbResult } = await saveFileToDb(song, Buffer.from(''), '')
-// 		if (dbResult?.rowCount !== 1) {
-// 			await query('ROLLBACK')
-// 			return next(new AppError(`Failed to save song to database`, 500))
-// 		}
-// 	}
+	for (const song of songsToAdd) {
+		const getCommand = new GetObjectCommand({
+			Bucket: bucketName,
+			Key: song,
+		})
 
-// 	for (const song of songsToDelete) {
-// 		const dbResult = await query(loadSqlQuery('delete-song.sql'), [song])
-// 		if (dbResult?.rowCount !== 1) {
-// 			await query('ROLLBACK')
-// 			return next(new AppError(`Failed to delete song from database`, 500))
-// 		}
-// 	}
+		let fileStream
+		try {
+			fileStream = await s3.send(getCommand)
+		} catch (err) {
+			next(new AppError(`Failed to retrieve file with id ${song} from S3`, 500))
+			continue
+		}
 
-// 	await query('COMMIT')
-// 	res.json({ songsToAdd, songsToDelete })
-// })
+		const metadata = fileStream.Metadata
+		if (!metadata) {
+			next(new AppError(`Failed to retrieve metadata for file with id ${song} from S3`, 500))
+			continue
+		}
+
+		try {
+			const dbResult = await query(loadSqlQuery('insert-song.sql'), [metadata.filename, metadata])
+			if (dbResult?.rowCount !== 1) {
+				next(new AppError(`Failed to save song with id ${song} to database`, 500))
+				continue
+			}
+
+			console.info(`Successfully saved song with id ${song} to database`)
+		} catch (err) {
+			next(new AppError(`Failed to save song with id ${song} to database`, 500, err))
+			continue
+		}
+	}
+
+	for (const song of songsToDelete) {
+		try {
+			const dbResult = await query(loadSqlQuery('delete-song.sql'), [song])
+			if (dbResult?.rowCount !== 1) {
+				next(new AppError(`Failed to delete song with id ${song} from database`, 500))
+				continue
+			}
+
+			console.info(`Successfully deleted song with id ${song} from database`)
+		} catch (err) {
+			next(new AppError(`Failed to delete song with id ${song} from database`, 500, err))
+			continue
+		}
+	}
+
+	try {
+		await query('COMMIT')
+		return res.json({ songsToAdd, songsToDelete })
+	} catch (err) {
+		return next(new AppError(`Failed to commit transaction`, 500, err))
+	}
+})
 
 export default dbRouter

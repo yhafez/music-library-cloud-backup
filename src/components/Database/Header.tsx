@@ -1,13 +1,39 @@
 import { Sync } from '@mui/icons-material'
 import { Box, IconButton, Tooltip, Typography } from '@mui/material'
 
+import axios from 'axios'
 import type { Song } from '../../../types'
+import useSnackbar from '../../hooks/useSnackbar'
 
 interface HeaderProps {
 	songs: Song[]
+	setSongs: (songs: Song[]) => void
 }
 
-const Header = ({ songs }: HeaderProps) => {
+const Header = ({ songs, setSongs }: HeaderProps) => {
+	const { setMessage, setType } = useSnackbar()
+
+	const handleSync = async () => {
+		try {
+			const syncResult = await axios.get('/api/songs/db/sync')
+			if (syncResult.status === 200) {
+				const listResult = await axios.get('/api/songs/db/list')
+				if (listResult.status === 200) {
+					setSongs(listResult.data)
+					setType('success')
+					setMessage('Database synced with S3 bucket')
+				} else {
+					setType('error')
+					setMessage('Error fetching songs')
+				}
+			}
+		} catch (err) {
+			console.error('Error syncing songs:', err)
+			setType('error')
+			setMessage('Error syncing songs')
+		}
+	}
+
 	return (
 		<>
 			<Box
@@ -23,7 +49,7 @@ const Header = ({ songs }: HeaderProps) => {
 				<Tooltip title="Sync database with S3 bucket">
 					<IconButton
 						aria-label="sync database with S3 bucket"
-						disabled
+						onClick={handleSync}
 						sx={{
 							'&:hover': {
 								color: 'primary.main',

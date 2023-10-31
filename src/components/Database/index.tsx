@@ -51,7 +51,7 @@ const Database = ({ songs, setSongs }: DatabaseProps) => {
 				borderRadius: '1rem',
 			}}
 		>
-			<Header songs={songs} />
+			<Header songs={songs} setSongs={setSongs} />
 			{songs.length > 0 && (
 				<TableContainer component={Paper}>
 					<Table>
