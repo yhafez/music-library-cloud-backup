@@ -112,7 +112,6 @@
 			"commit-msg": "pnpm husky:commit-msg"
 		}
 	},
-	},
 	"lint-staged": {
 		"*.{ts,tsx,js}": [
 			"eslint --config .eslintrc"
