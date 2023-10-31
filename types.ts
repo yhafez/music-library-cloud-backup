@@ -9,10 +9,11 @@ export interface Song {
 }
 
 export interface Metadata {
+	fileName: string
 	title: string
 	artist: string
 	album: string
-	genre: string[]
+	genre: string
 	key: string
-	bpm: number
+	bpm: string
 }

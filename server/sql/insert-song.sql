@@ -1,1 +1,1 @@
-INSERT INTO songs (filename, metadata) VALUES ($1, $2);
+INSERT INTO songs (filename, metadata) VALUES ($1, $2) RETURNING id;

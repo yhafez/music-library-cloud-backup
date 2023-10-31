@@ -1,9 +1,7 @@
-import { Container, createTheme, useMediaQuery } from '@mui/material'
-import CssBaseline from '@mui/material/CssBaseline'
-import { ThemeProvider } from '@mui/material/styles'
+import { Container, CssBaseline, ThemeProvider, createTheme, useMediaQuery } from '@mui/material'
 import { useMemo, useState } from 'react'
 
-import { Song } from '../types'
+import type { Song } from '../types'
 import Database from './components/Database'
 import Header from './components/Header'
 import Navbar from './components/Navbar'
@@ -27,7 +25,7 @@ function App() {
 	return (
 		<ThemeProvider theme={theme}>
 			<CssBaseline enableColorScheme />
-			<Container component="main" maxWidth="md">
+			<Container component="main">
 				<Navbar darkMode={darkMode} setDarkMode={setDarkMode} />
 				<Header />
 				<Upload setSongs={setSongs} />
