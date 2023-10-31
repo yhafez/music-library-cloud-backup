@@ -1,9 +1,30 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-if git diff --cached --name-only | xargs grep -E 'console\.log\('; then
-  echo "Error: Found console.log statements in staged files. Please remove them before committing."
+# Capture the list of staged files
+staged_files=$(git diff --cached --name-only)
+
+# Initialize a variable to track whether there are any issues
+found_issue=false
+
+# Loop through the staged files
+for file in $staged_files; do
+  # Check if the file is a JavaScript or TypeScript file
+  if [[ $file =~ \.(js|ts|jsx|tsx)$ ]]; then
+    # Use grep to find lines containing console.log
+    git show ":$file" | grep -n "console.log" | while IFS= read -r line; do
+      echo "Found console.log in $file at line $line"
+      found_issue=true
+      # Exit immediately when an issue is found
+      exit 1
+    done
+  fi
+done
+
+# Exit with an error code if any issues were found
+if [ "$found_issue" = true ]; then
   exit 1
 fi
 
+# Run additional checks and tests only if there are no console.log issues
 pnpm lint-staged && pnpm type-check && pnpm test && git add .
