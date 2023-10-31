@@ -43,7 +43,9 @@
 		"lint:format": "prettier  --config ./.prettierrc --loglevel warn --write \"./**/*.{js,jsx,ts,tsx,css,md,json}\" ",
 		"type-check": "tsc",
 		"storybook": "start-storybook -p 6006",
-		"build-storybook": "build-storybook"
+		"build-storybook": "build-storybook",
+		"husky:pre-commit": "sh .husky/pre-commit",
+		"husky:pre-push": "sh .husky/pre-push"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.437.0",
@@ -106,7 +108,7 @@
 		"tsconfig-paths": "^4.2.0",
 		"typescript": "^4.9.5"
 	},
-	"husky":{
+	"husky": {
 		"hooks": {
 			"pre-commit": "pnpm husky:pre-commit",
 			"commit-msg": "pnpm husky:commit-msg"
