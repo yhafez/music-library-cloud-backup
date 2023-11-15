@@ -1,12 +1,14 @@
 import {
 	DeleteObjectCommand,
 	DeleteObjectCommandOutput,
+	GetObjectCommand,
 	ListObjectsV2Command,
 	PutObjectCommand,
 	PutObjectCommandOutput,
 } from '@aws-sdk/client-s3'
 import { NextFunction, Request, Response, Router } from 'express'
 import multer from 'multer'
+import { Readable } from 'stream'
 
 import { QueryResult } from 'pg'
 import { Metadata, Song } from '../../types'
@@ -190,6 +192,56 @@ s3Router.delete('/delete/:id', async (req: Request, res: Response, next: NextFun
 			console.error('Rollback Error:', rollbackError)
 		}
 		return next(new AppError(`Failed to commit transaction`, 500, err))
+	}
+})
+
+s3Router.get('/download/:id', async (req: Request, res: Response, next: NextFunction) => {
+	const { id } = req.params
+
+	// Check if file exists
+	const fileDoesNotExistError = await getFileById(id)
+	if (fileDoesNotExistError instanceof AppError) {
+		return next(fileDoesNotExistError)
+	}
+
+	const command = new GetObjectCommand({
+		Bucket: bucketName,
+		Key: id,
+	})
+
+	try {
+		const result = await s3.send(command)
+		if (result.$metadata.httpStatusCode !== 200) {
+			return next(
+				new AppError(`Failed to retrieve objects from S3`, result.$metadata.httpStatusCode),
+			)
+		}
+
+		if (
+			!result.Body ||
+			!result.ContentType ||
+			!result.Metadata?.filename ||
+			!result.ContentLength
+		) {
+			return next(new AppError(`Failed to retrieve file from S3`, 500))
+		}
+
+		// Convert blob to byte array
+		const chunks = await result.Body.transformToByteArray()
+
+		// Create a readable stream from the byte array
+		const readableStream = Readable.from([chunks])
+
+		// Set headers for download
+		res.setHeader('Content-Type', result.ContentType)
+		res.setHeader('Content-Disposition', `attachment; filename=${result.Metadata.filename}`)
+		res.setHeader('Content-Length', result.ContentLength)
+
+		// Return file as stream
+		return readableStream.pipe(res)
+	} catch (err) {
+		console.error(err)
+		return next(new AppError(`Failed to retrieve file from S3`, 500))
 	}
 })
 

@@ -149,7 +149,11 @@ dbRouter.get('/sync', async (_req: Request, res: Response, next: NextFunction) =
 		}
 
 		try {
-			const dbResult = await query(loadSqlQuery('insert-song.sql'), [metadata.filename, metadata])
+			const dbResult = await query(loadSqlQuery('insert-song-with-id.sql'), [
+				metadata.filename,
+				metadata,
+				song,
+			])
 			if (dbResult?.rowCount !== 1) {
 				next(new AppError(`Failed to save song with id ${song} to database`, 500))
 				continue
