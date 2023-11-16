@@ -113,6 +113,35 @@ Rename `.env.sample` to `.env`.
 
 1. Optional: If needed, you can add a bucket policy for more granular access control. This is usually not necessary for basic operations.
 
+### Configure CORS Access
+
+1. Go to your bucket in the S3 console.
+
+1. Click on the “Permissions” tab.
+
+1. Under "Cross-origin resource sharing (CORS)", click "Edit" and add a CORS policy that allows access from your domain then click "Save Changes". For example:
+
+```
+[
+    {
+        "AllowedHeaders": [
+            "*"
+        ],
+        "AllowedMethods": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "HEAD"
+        ],
+        "AllowedOrigins": [
+            "http://localhost:3000"
+        ],
+        "ExposeHeaders": []
+    }
+]
+```
+
 ## Usage
 
 To build the project for production:
