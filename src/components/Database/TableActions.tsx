@@ -4,17 +4,17 @@ import axios from 'axios'
 import { useState } from 'react'
 
 import type { Song } from '../../../types'
-import useSnackbar from '../../hooks/useSnackbar'
 import ConfirmDeleteModal from './ConfirmDeleteModal'
 
 interface TableActionsProps {
 	type: 'db' | 's3'
 	songId: number
 	setSongs: (songs: Song[]) => void
+	setMessage: (message: string) => void
+	setType: (type: 'success' | 'error' | 'info' | 'warning' | null) => void
 }
 
-const TableActions = ({ type, songId, setSongs }: TableActionsProps) => {
-	const { setMessage, setType } = useSnackbar()
+const TableActions = ({ type, songId, setSongs, setMessage, setType }: TableActionsProps) => {
 	const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState<number | null>(null)
 
 	const handleDownload = async () => {
@@ -51,33 +51,37 @@ const TableActions = ({ type, songId, setSongs }: TableActionsProps) => {
 	}
 
 	return (
-		<TableCell align="center">
-			<Box
-				sx={{
-					display: 'flex',
-					justifyContent: 'space-evenly',
-				}}
-			>
-				{type === 's3' && (
-					<IconButton aria-label="download" onClick={handleDownload}>
-						<Download />
+		<>
+			<TableCell align="center">
+				<Box
+					sx={{
+						display: 'flex',
+						justifyContent: 'space-evenly',
+					}}
+				>
+					{type === 's3' && (
+						<IconButton aria-label="download" onClick={handleDownload}>
+							<Download />
+						</IconButton>
+					)}
+					<IconButton aria-label="edit" disabled>
+						<Edit />
 					</IconButton>
-				)}
-				<IconButton aria-label="edit" disabled>
-					<Edit />
-				</IconButton>
-				<IconButton aria-label="delete" onClick={() => setShowConfirmDeleteModal(songId)}>
-					<Delete />
-				</IconButton>
-			</Box>
-			<ConfirmDeleteModal
-				type={type}
-				songId={songId}
-				setSongs={setSongs}
-				showConfirmDeleteModal={showConfirmDeleteModal === songId}
-				setShowConfirmDeleteModal={setShowConfirmDeleteModal}
-			/>
-		</TableCell>
+					<IconButton aria-label="delete" onClick={() => setShowConfirmDeleteModal(songId)}>
+						<Delete />
+					</IconButton>
+				</Box>
+				<ConfirmDeleteModal
+					type={type}
+					songId={songId}
+					setSongs={setSongs}
+					showConfirmDeleteModal={showConfirmDeleteModal === songId}
+					setShowConfirmDeleteModal={setShowConfirmDeleteModal}
+					setMessage={setMessage}
+					setType={setType}
+				/>
+			</TableCell>
+		</>
 	)
 }
 

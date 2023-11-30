@@ -1,3 +1,6 @@
 export { default as getFileFromS3ById } from './getFileFromS3ById'
 export { default as handleS3Error } from './handleS3Error'
 export { default as listFilesInS3 } from './listFilesInS3'
+export { default as uploadFileToS3 } from './uploadFileToS3'
+export { default as deleteSongFromS3 } from './deleteSongFromS3'
+export { default as downloadFileFromS3 } from './downloadFileFromS3'

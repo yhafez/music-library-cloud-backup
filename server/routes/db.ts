@@ -3,7 +3,7 @@ import multer from 'multer'
 
 import { AppError } from '../middleware/error-handler'
 import { errorValidateFileName, validateFileName } from '../middleware/validation'
-import { deleteFileFromDb, listFilesInDb, uploadFileToDb, syncDbWithS3 } from '../utils/database'
+import { deleteFileFromDb, listFilesInDb, uploadFileToDb, syncDbWithS3 } from '../utils/db'
 
 const dbRouter = Router()
 
@@ -31,7 +31,11 @@ dbRouter.post(
 		const fileContent = req.file.buffer
 
 		try {
-			const dbResult = await uploadFileToDb(fileName, fileContent, req.file.mimetype)
+			const dbResult = await uploadFileToDb({
+				fileName,
+				fileContent,
+				fileMimeType: req.file.mimetype,
+			})
 			if (dbResult instanceof AppError) return next(dbResult)
 		} catch (err) {
 			return next(err)
@@ -41,7 +45,6 @@ dbRouter.post(
 
 dbRouter.delete('/delete/:id', async (req: Request, res: Response, next: NextFunction) => {
 	const { id } = req.params
-
 	try {
 		const dbResult = await deleteFileFromDb(id)
 		if (dbResult instanceof AppError) return next(dbResult)

@@ -3,7 +3,7 @@ import { QueryResult } from 'pg'
 import type { Song } from '../../../types'
 import { query } from '../../db'
 import handleDbError from './handleDbError'
-import loadSqlQuery from '../../utils/loadSqlQuery'
+import loadSqlQuery from '../loadSqlQuery'
 import { getFileFromS3ById, handleS3Error } from '../s3'
 import { AppError } from '../../middleware/error-handler'
 
@@ -24,6 +24,7 @@ const uploadFileFromS3ToDb = async (id: string): Promise<QueryResult<Song> | App
 	}
 
 	try {
+		console.log({ id })
 		const dbResult = await query(loadSqlQuery('insert-song-with-id.sql'), [
 			metadata.filename,
 			metadata,

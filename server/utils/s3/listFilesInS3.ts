@@ -10,7 +10,10 @@ const listFilesInS3 = async (): Promise<ListObjectsV2Output | AppError> => {
 	})
 	try {
 		const result = await s3.send(command)
-		if (!result) return handleS3Error(new AppError(`Failed to retrieve objects from S3`, 500))
+		if (result.$metadata.httpStatusCode !== 200)
+			return handleS3Error(
+				new AppError(`Failed to retrieve objects from S3`, result.$metadata.httpStatusCode),
+			)
 		return result
 	} catch (err) {
 		if (err instanceof Error) {

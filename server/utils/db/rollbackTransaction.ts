@@ -2,8 +2,8 @@ import { QueryResult } from 'pg'
 
 import type { Song } from '../../../types'
 import { query } from '../../db'
-import { AppError } from '../../middleware/error-handler'
 import handleDbError from './handleDbError'
+import { AppError } from '../../middleware/error-handler'
 
 const rollbackTransaction = async (): Promise<QueryResult<Song> | AppError> => {
 	try {

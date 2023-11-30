@@ -2,8 +2,8 @@ import { QueryResult } from 'pg'
 
 import type { Song } from '../../../types'
 import { query } from '../../db'
+import loadSqlQuery from '../loadSqlQuery'
 import handleDbError from './handleDbError'
-import loadSqlQuery from '../../utils/loadSqlQuery'
 import { AppError } from '../../middleware/error-handler'
 
 const listFilesInDb = async (): Promise<QueryResult<Song> | AppError> => {

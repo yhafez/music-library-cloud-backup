@@ -2,8 +2,8 @@ import { QueryResult } from 'pg'
 import { ListObjectsV2Output } from '@aws-sdk/client-s3'
 
 import { Song } from '../../../types'
-import listFilesInDb from './listFilesInDb'
 import handleDbError from './handleDbError'
+import listFilesInDb from './listFilesInDb'
 import { handleS3Error, listFilesInS3 } from '../s3'
 import { AppError } from '../../middleware/error-handler'
 import uploadFileFromS3ToDb from './uploadFileFromS3ToDb'
@@ -32,6 +32,7 @@ const syncDbWithS3 = async (): Promise<
 	const s3SongIds =
 		(s3Result.Contents?.map(object => object.Key).filter(key => key !== undefined) as string[]) ??
 		[]
+	console.log({ s3SongIds })
 
 	const songsToAdd = s3SongIds.filter(id => !dbSongIds.includes(+id))
 	const songsToDelete = dbSongIds.filter(id => !s3SongIds.includes(id.toString()))

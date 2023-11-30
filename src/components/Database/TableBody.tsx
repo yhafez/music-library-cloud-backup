@@ -6,9 +6,11 @@ import TableActions from './TableActions'
 interface TableBodyProps {
 	songs: Song[]
 	setSongs: (songs: Song[]) => void
+	setMessage: (message: string) => void
+	setType: (type: 'success' | 'error' | 'info' | 'warning' | null) => void
 }
 
-const TableBodyComponent = ({ songs, setSongs }: TableBodyProps) => {
+const TableBodyComponent = ({ songs, setSongs, setMessage, setType }: TableBodyProps) => {
 	return (
 		<TableBody>
 			{songs.map(song => (
@@ -20,8 +22,20 @@ const TableBodyComponent = ({ songs, setSongs }: TableBodyProps) => {
 					<TableCell align="center">{song.metadata.genre}</TableCell>
 					<TableCell align="center">{song.metadata.bpm}</TableCell>
 					<TableCell align="center">{song.metadata.key}</TableCell>
-					<TableActions type="db" songId={song.id} setSongs={setSongs} />
-					<TableActions type="s3" songId={song.id} setSongs={setSongs} />
+					<TableActions
+						type="db"
+						songId={song.id}
+						setSongs={setSongs}
+						setMessage={setMessage}
+						setType={setType}
+					/>
+					<TableActions
+						type="s3"
+						songId={song.id}
+						setSongs={setSongs}
+						setMessage={setMessage}
+						setType={setType}
+					/>
 				</TableRow>
 			))}
 		</TableBody>

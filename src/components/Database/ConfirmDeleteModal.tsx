@@ -11,7 +11,7 @@ import axios, { AxiosError } from 'axios'
 
 import { Song } from '../../../types'
 import useSnackbar from '../../hooks/useSnackbar'
-import SnackbarComponent from '../Snackbar'
+import Snackbar from '../Snackbar'
 
 interface ConfirmDeleteModalProps {
 	type: 'db' | 's3'
@@ -19,6 +19,8 @@ interface ConfirmDeleteModalProps {
 	setSongs: (songs: Song[]) => void
 	showConfirmDeleteModal: boolean
 	setShowConfirmDeleteModal: (songId: number | null) => void
+	setMessage: (message: string) => void
+	setType: (type: 'success' | 'error' | 'info' | 'warning' | null) => void
 }
 
 const ConfirmDeleteModal = ({
@@ -27,9 +29,10 @@ const ConfirmDeleteModal = ({
 	setSongs,
 	showConfirmDeleteModal,
 	setShowConfirmDeleteModal,
+	setMessage,
+	setType,
 }: ConfirmDeleteModalProps) => {
 	const theme = useTheme()
-	const { setMessage, setType, type: messageType, message } = useSnackbar()
 
 	const handleDelete = async () => {
 		const url = `/api/songs/${type}/delete/${songId}`
@@ -37,12 +40,12 @@ const ConfirmDeleteModal = ({
 			// Delete the song from the database
 			await axios.delete(url)
 
+			setType('success')
+			setMessage(`Song deleted from database${type === 's3' ? ' and S3' : ''}`)
+
 			// Refresh the list of songs
 			const response = await axios.get('/api/songs/db/list')
 			setSongs(response.data)
-
-			setType('success')
-			setMessage(`Song deleted from database${type === 's3' ? ' and S3' : ''}`)
 		} catch (error) {
 			console.error(`Error deleting song from database${type === 's3' ? ' and S3' : ''}: ${error}`)
 			if (error instanceof AxiosError && error.response?.status === 404) {
@@ -89,14 +92,6 @@ const ConfirmDeleteModal = ({
 					<Button onClick={() => setShowConfirmDeleteModal(null)}>Cancel</Button>
 				</DialogActions>
 			</Dialog>
-			{message && (
-				<SnackbarComponent
-					message={message}
-					setMessage={setMessage}
-					type={messageType}
-					setType={setType}
-				/>
-			)}
 		</>
 	)
 }

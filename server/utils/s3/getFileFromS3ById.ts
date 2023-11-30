@@ -11,7 +11,10 @@ const getFileFromS3ById = async (id: string): Promise<GetObjectCommandOutput | A
 	})
 	try {
 		const result = await s3.send(command)
-		if (!result) return handleS3Error(new AppError(`Failed to retrieve file from S3`, 500))
+		if (result.$metadata.httpStatusCode !== 200)
+			return handleS3Error(
+				new AppError(`Failed to retrieve file from S3`, result.$metadata.httpStatusCode),
+			)
 		return result
 	} catch (err) {
 		if (err instanceof Error) {
