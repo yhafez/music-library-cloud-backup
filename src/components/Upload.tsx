@@ -1,10 +1,11 @@
-import { Box, Button, Typography, useTheme } from '@mui/material'
+import { Box, Button, IconButton, List, Typography, useTheme } from '@mui/material'
 import axios, { AxiosError } from 'axios'
 import { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from 'react'
 
 import type { Song } from '../../types'
 import useSnackbar from '../hooks/useSnackbar'
 import Snackbar from './Snackbar'
+import { Delete } from '@mui/icons-material'
 
 interface UploadProps {
 	setSongs: Dispatch<SetStateAction<Song[]>>
@@ -14,15 +15,18 @@ const Upload = ({ setSongs }: UploadProps) => {
 	const theme = useTheme()
 
 	const { setMessage, setType, type, message } = useSnackbar()
-	const [file, setFile] = useState<File | null>(null)
+	const [files, setFiles] = useState<FileList | null>(null)
 	const [loading, setLoading] = useState(false)
 
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
 
 	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-		if (!e.target.files) return console.error('No files selected')
-		const selectedFile = e.target.files[0]
-		setFile(selectedFile)
+		const selectedFiles = e.target.files
+		if (!selectedFiles || selectedFiles.length === 0) {
+			setFiles(null)
+			return
+		}
+		setFiles(selectedFiles)
 	}
 
 	const handleUploadClick = async () => {
@@ -32,49 +36,53 @@ const Upload = ({ setSongs }: UploadProps) => {
 	}
 
 	const handleUploadConfirm = async () => {
-		// Create a FormData object to send the file to the server
-		const formData = new FormData()
-		if (!file) return console.error('No file selected')
-		formData.append('file', file)
-
+		if (!files || files.length === 0) return console.error('No files selected')
 		try {
 			setLoading(true)
+			const formData = new FormData()
+			if (files.length === 1) {
+				formData.append('file', files[0])
+				await axios.post('/api/songs/s3/upload', formData, {
+					headers: {
+						'Content-Type': 'multipart/form-data',
+					},
+				})
+			} else {
+				for (let i = 0; i < files.length; i++) {
+					formData.append('files', files[i])
+				}
+				await axios.post('/api/songs/s3/bulkupload', formData, {
+					headers: {
+						'Content-Type': 'multipart/form-data',
+					},
+				})
+			}
 
-			// Upload the file to the server
-			await axios.post('/api/songs/s3/upload', formData, {
-				headers: {
-					'Content-Type': 'multipart/form-data',
-				},
-			})
-
-			// Refresh the list of songs
 			const response = await axios.get('/api/songs/db/list')
 			setSongs(response.data)
 
-			// Clear the selected file
-			setFile(null)
+			setFiles(null)
 			if (fileInputRef.current) {
 				fileInputRef.current.value = ''
 			}
 
 			setType('success')
-			setMessage('File uploaded successfully')
+			setMessage('Files uploaded successfully')
 			setLoading(false)
 		} catch (error) {
-			console.error('Error uploading file:', error)
+			console.error('Error uploading files:', error)
 
 			if (error instanceof AxiosError) {
 				if (error.response?.data?.error) {
 					setType('error')
-					setMessage(`Error uploading file: ${error.response.data.error}`)
+					setMessage(`Error uploading files: ${error.response.data.error}`)
 				}
 			} else {
 				setType('error')
-				setMessage('Error uploading file')
+				setMessage('Error uploading files')
 			}
 
-			// Clear the selected file
-			setFile(null)
+			setFiles(null)
 			if (fileInputRef.current) {
 				fileInputRef.current.value = ''
 			}
@@ -84,8 +92,7 @@ const Upload = ({ setSongs }: UploadProps) => {
 	}
 
 	const handleCancelClick = () => {
-		// Clear the selected file and the file input field
-		setFile(null)
+		setFiles(null)
 		if (fileInputRef.current) {
 			fileInputRef.current.value = ''
 		}
@@ -110,12 +117,91 @@ const Upload = ({ setSongs }: UploadProps) => {
 				onChange={handleFileChange}
 				ref={fileInputRef}
 				style={{ display: 'none' }}
+				multiple
 			/>
 			<Typography variant="h4" component="h2" gutterBottom>
-				Upload a song to your database
+				Upload songs to your database
 			</Typography>
-			{file ? (
+			{files !== null ? ( // Check if files are selected
 				<>
+					<Box
+						sx={{
+							display: 'flex',
+							flexDirection: 'column',
+							alignItems: 'center',
+							justifyContent: 'center',
+							width: '100%',
+							gap: '1rem',
+						}}
+					>
+						<Typography
+							variant="body1"
+							component="p"
+							sx={{
+								color: theme.palette.primary.main,
+								fontWeight: 'bold',
+								mt: '1rem',
+								textAlign: 'center',
+								fontSize: '1.2rem',
+							}}
+						>
+							Selected files:
+						</Typography>
+						<List
+							sx={{
+								maxHeight: '10rem',
+								overflowY: 'auto',
+								overflowX: 'hidden',
+								border: `1px solid ${theme.palette.primary.main}`,
+								borderRadius: '0.5rem',
+								padding: '0.5rem',
+							}}
+						>
+							{Array.from(files).map(file => (
+								<Box
+									sx={{
+										display: 'flex',
+										alignItems: 'center',
+										gap: '0.5rem',
+										padding: '0.5rem',
+										borderBottom: `1px solid ${theme.palette.primary.main}`,
+										'&:last-child': {
+											borderBottom: 'none',
+										},
+									}}
+									key={file.name}
+								>
+									<IconButton
+										aria-label="delete"
+										onClick={() => {
+											const dataTransfer = new DataTransfer()
+											const newFiles = Array.from(files).filter(f => f.name !== file.name)
+											newFiles.forEach(f => dataTransfer.items.add(f))
+											const fileList = dataTransfer.files
+											setFiles(newFiles.length > 0 ? fileList : null)
+											if (fileInputRef.current) fileInputRef.current.files = fileList
+										}}
+									>
+										<Delete
+											sx={{
+												color: theme.palette.error.main,
+											}}
+											fontSize="small"
+										/>
+									</IconButton>
+									<Typography
+										variant="body1"
+										component="p"
+										sx={{
+											fontSize: '0.9rem',
+										}}
+									>
+										{file.name}
+									</Typography>
+								</Box>
+							))}
+						</List>
+					</Box>
 					{loading ? (
 						<Typography
 							variant="body1"
@@ -123,7 +209,7 @@ const Upload = ({ setSongs }: UploadProps) => {
 							sx={{
 								color: theme.palette.primary.main,
 								fontWeight: 'bold',
-								my: '1rem',
+								mt: '1.5rem',
 							}}
 						>
 							Uploading...
@@ -136,7 +222,7 @@ const Upload = ({ setSongs }: UploadProps) => {
 								alignItems: 'center',
 								width: '100%',
 								gap: '1rem',
-								my: '1rem',
+								mt: '1.5rem',
 							}}
 						>
 							<Button variant="contained" onClick={handleUploadConfirm}>
@@ -147,9 +233,6 @@ const Upload = ({ setSongs }: UploadProps) => {
 							</Button>
 						</Box>
 					)}
-					<Typography variant="body1" component="p">
-						Selected file: {file.name}
-					</Typography>
 				</>
 			) : (
 				<>
@@ -157,15 +240,12 @@ const Upload = ({ setSongs }: UploadProps) => {
 						variant="contained"
 						onClick={handleUploadClick}
 						sx={{
-							my: '1rem',
+							mt: '1rem',
 							alignSelf: 'center',
 						}}
 					>
-						Select File
+						Select Files
 					</Button>
-					<Typography variant="body1" component="p">
-						No file selected.
-					</Typography>
 				</>
 			)}
 			{message && (
