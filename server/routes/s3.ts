@@ -1,19 +1,9 @@
-import { GetObjectCommand } from '@aws-sdk/client-s3'
-import { NextFunction, Request, Response, Router } from 'express'
 import multer from 'multer'
-import { Readable } from 'stream'
+import { NextFunction, Request, Response, Router } from 'express'
 
-import { bucketName, s3 } from '../index'
 import { AppError } from '../middleware/error-handler'
 import { errorValidateFileName, validateFileName } from '../middleware/validation'
-import { getFileById } from '../utils/getFile'
-import {
-	deleteSongFromS3,
-	downloadFileFromS3,
-	handleS3Error,
-	listFilesInS3,
-	uploadFileToS3,
-} from '../utils/s3'
+import { deleteSongFromS3, downloadFileFromS3, listFilesInS3, uploadFileToS3 } from '../utils/s3'
 
 const s3Router = Router()
 
