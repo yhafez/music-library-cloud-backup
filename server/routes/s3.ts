@@ -58,6 +58,7 @@ s3Router.get('/download/:id', async (req: Request, res: Response, next: NextFunc
 	try {
 		const s3Result = await downloadFileFromS3(id)
 		if (s3Result instanceof AppError) return next(s3Result)
+
 		const { readableStream, result } = s3Result
 		if (!result.ContentType || !result.Metadata?.filename || !result.ContentLength)
 			return next(new AppError(`Failed to retrieve file from S3`, 500))
