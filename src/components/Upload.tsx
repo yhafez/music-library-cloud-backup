@@ -23,10 +23,20 @@ const Upload = ({ setSongs }: UploadProps) => {
 	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const selectedFiles = e.target.files
 		if (!selectedFiles || selectedFiles.length === 0) {
-			setFiles(null)
+			setFiles(null) // Clear the files state when no files are selected
 			return
 		}
-		setFiles(selectedFiles)
+
+		const dataTransfer = new DataTransfer()
+
+		const allowedFileTypes = ['audio/mpeg', 'audio/wav']
+		const filteredFiles = Array.from(selectedFiles).filter(file =>
+			allowedFileTypes.includes(file.type),
+		)
+		filteredFiles.forEach(f => dataTransfer.items.add(f))
+		const fileList = dataTransfer.files
+		setFiles(filteredFiles.length > 0 ? fileList : null)
+		if (fileInputRef.current) fileInputRef.current.files = fileList
 	}
 
 	const handleUploadClick = async () => {
@@ -118,11 +128,12 @@ const Upload = ({ setSongs }: UploadProps) => {
 				ref={fileInputRef}
 				style={{ display: 'none' }}
 				multiple
+				accept=".mp3, .wav"
 			/>
 			<Typography variant="h4" component="h2" gutterBottom>
 				Upload songs to your database
 			</Typography>
-			{files !== null ? ( // Check if files are selected
+			{files !== null ? (
 				<>
 					<Box
 						sx={{
