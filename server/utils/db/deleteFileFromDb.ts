@@ -13,7 +13,7 @@ const deleteFileFromDb = async (id: string): Promise<QueryResult<Song> | AppErro
 	if (fileDoesNotExistError instanceof AppError) return fileDoesNotExistError
 
 	try {
-		const dbResult = await query(loadSqlQuery('delete-song.sql'), [id])
+		const dbResult = await query({ text: loadSqlQuery('delete-song.sql'), params: [id] })
 		if (dbResult?.rowCount !== 1)
 			return handleDbError(new AppError(`Failed to delete song from database`, 500))
 

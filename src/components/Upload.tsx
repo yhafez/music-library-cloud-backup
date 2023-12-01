@@ -1,6 +1,6 @@
-import { Box, Button, IconButton, List, Typography, useTheme } from '@mui/material'
+import { Box, Button, IconButton, List, ListItem, Typography, useTheme } from '@mui/material'
+import { ChangeEvent, Dispatch, SetStateAction, useEffect, useRef, useState } from 'react'
 import axios, { AxiosError } from 'axios'
-import { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from 'react'
 
 import type { Song } from '../../types'
 import useSnackbar from '../hooks/useSnackbar'
@@ -9,21 +9,23 @@ import { Delete } from '@mui/icons-material'
 
 interface UploadProps {
 	setSongs: Dispatch<SetStateAction<Song[]>>
+	setFailedFiles: Dispatch<SetStateAction<string[]>>
 }
 
-const Upload = ({ setSongs }: UploadProps) => {
+const Upload = ({ setSongs, setFailedFiles }: UploadProps) => {
 	const theme = useTheme()
 
 	const { setMessage, setType, type, message } = useSnackbar()
 	const [files, setFiles] = useState<FileList | null>(null)
 	const [loading, setLoading] = useState(false)
+	const [filesUploading, setFilesUploading] = useState<string[]>([])
 
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
 
 	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const selectedFiles = e.target.files
 		if (!selectedFiles || selectedFiles.length === 0) {
-			setFiles(null) // Clear the files state when no files are selected
+			setFiles(null)
 			return
 		}
 
@@ -47,38 +49,114 @@ const Upload = ({ setSongs }: UploadProps) => {
 
 	const handleUploadConfirm = async () => {
 		if (!files || files.length === 0) return console.error('No files selected')
+		setLoading(true)
+		setFailedFiles([])
 		try {
-			setLoading(true)
-			const formData = new FormData()
 			if (files.length === 1) {
+				setFilesUploading([files[0].name])
+				const formData = new FormData()
 				formData.append('file', files[0])
-				await axios.post('/api/songs/s3/upload', formData, {
-					headers: {
-						'Content-Type': 'multipart/form-data',
-					},
-				})
-			} else {
-				for (let i = 0; i < files.length; i++) {
-					formData.append('files', files[i])
+				try {
+					const res = await axios.post('/api/songs/s3/upload', formData, {
+						headers: {
+							'Content-Type': 'multipart/form-data',
+						},
+					})
+					if (res.data.error) {
+						setType('error')
+						setMessage(`Error uploading file ${files[0].name}: ${res.data.error}`)
+					}
+					setType('success')
+					setMessage('Files uploaded successfully')
+				} catch (error) {
+					console.error('Error uploading file:', error)
+					if (error instanceof AxiosError) {
+						if (error.response?.data?.error) {
+							setType('error')
+							setMessage(`Error uploading file ${files[0].name}: ${error.response.data.error}`)
+						}
+					} else {
+						setType('error')
+						setMessage(`Error uploading file ${files[0].name}`)
+					}
+				} finally {
+					setFilesUploading([])
 				}
-				await axios.post('/api/songs/s3/bulkupload', formData, {
-					headers: {
-						'Content-Type': 'multipart/form-data',
-					},
-				})
+			} else {
+				// Upload files in parallel in batches of 50
+				const promises: Promise<{
+					data: {
+						error?: string
+					}
+				} | void>[] = []
+				for (let i = 0; i < files.length; i += 50) {
+					Array.from(files)
+						.slice(i, i + 50)
+						.forEach(file => {
+							const formData = new FormData()
+							formData.append('file', file)
+							promises.push(
+								axios
+									.post('/api/songs/s3/upload', formData, {
+										headers: {
+											'Content-Type': 'multipart/form-data',
+										},
+									})
+									.catch(() => {
+										setFailedFiles(prevFailedFiles => [...prevFailedFiles, file.name])
+									}),
+							)
+						})
+					try {
+						setFilesUploading(
+							Array.from(files)
+								.slice(i, i + 50)
+								.map(f => f.name),
+						)
+						await Promise.all(promises)
+						setType('success')
+						setMessage('Files uploaded successfully')
+					} catch (error) {
+						console.error('Error uploading files:', error)
+						if (error instanceof AxiosError) {
+							if (error.response?.data?.error) {
+								setType('error')
+								setMessage(`Error uploading files: ${error.response.data.error}`)
+							}
+						} else {
+							setType('error')
+							setMessage('Error uploading files')
+						}
+					} finally {
+						setFilesUploading([])
+					}
+				}
 			}
 
-			const response = await axios.get('/api/songs/db/list')
-			setSongs(response.data)
+			try {
+				const response = await axios.get('/api/songs/db/list')
+				if (response.data.error) {
+					setType('error')
+					setMessage(`Error retrieving songs: ${response.data.error}`)
+				}
+				setSongs(response.data)
+			} catch (error) {
+				console.error('Error retrieving songs:', error)
+				if (error instanceof AxiosError) {
+					if (error.response?.data?.error) {
+						setType('error')
+						setMessage(`Error retrieving songs: ${error.response.data.error}`)
+					}
+				} else {
+					setType('error')
+					setMessage('Error retrieving songs')
+				}
+			}
 
 			setFiles(null)
 			if (fileInputRef.current) {
 				fileInputRef.current.value = ''
 			}
-
-			setType('success')
-			setMessage('Files uploaded successfully')
-			setLoading(false)
 		} catch (error) {
 			console.error('Error uploading files:', error)
 
@@ -96,7 +174,7 @@ const Upload = ({ setSongs }: UploadProps) => {
 			if (fileInputRef.current) {
 				fileInputRef.current.value = ''
 			}
-
+		} finally {
 			setLoading(false)
 		}
 	}
@@ -135,114 +213,164 @@ const Upload = ({ setSongs }: UploadProps) => {
 			</Typography>
 			{files !== null ? (
 				<>
-					<Box
-						sx={{
-							display: 'flex',
-							flexDirection: 'column',
-							alignItems: 'center',
-							justifyContent: 'center',
-							width: '100%',
-							gap: '1rem',
-						}}
-					>
-						<Typography
-							variant="body1"
-							component="p"
-							sx={{
-								color: theme.palette.primary.main,
-								fontWeight: 'bold',
-								mt: '1rem',
-								textAlign: 'center',
-								fontSize: '1.2rem',
-							}}
-						>
-							Selected files:
-						</Typography>
-						<List
-							sx={{
-								maxHeight: '10rem',
-								overflowY: 'auto',
-								overflowX: 'hidden',
-								border: `1px solid ${theme.palette.primary.main}`,
-								borderRadius: '0.5rem',
-								padding: '0.5rem',
-							}}
-						>
-							{Array.from(files).map(file => (
-								<Box
-									sx={{
-										display: 'flex',
-										alignItems: 'center',
-										gap: '0.5rem',
-										padding: '0.5rem',
-										borderBottom: `1px solid ${theme.palette.primary.main}`,
-										'&:last-child': {
-											borderBottom: 'none',
-										},
-									}}
-									key={file.name}
-								>
-									<IconButton
-										aria-label="delete"
-										onClick={() => {
-											const dataTransfer = new DataTransfer()
-											const newFiles = Array.from(files).filter(f => f.name !== file.name)
-											newFiles.forEach(f => dataTransfer.items.add(f))
-											const fileList = dataTransfer.files
-											setFiles(newFiles.length > 0 ? fileList : null)
-											if (fileInputRef.current) fileInputRef.current.files = fileList
-										}}
-									>
-										<Delete
-											sx={{
-												color: theme.palette.error.main,
-											}}
-											fontSize="small"
-										/>
-									</IconButton>
-									<Typography
-										variant="body1"
-										component="p"
-										sx={{
-											fontSize: '0.9rem',
-										}}
-									>
-										{file.name}
-									</Typography>
-								</Box>
-							))}
-						</List>
-					</Box>
 					{loading ? (
-						<Typography
-							variant="body1"
-							component="p"
-							sx={{
-								color: theme.palette.primary.main,
-								fontWeight: 'bold',
-								mt: '1.5rem',
-							}}
-						>
-							Uploading...
-						</Typography>
-					) : (
 						<Box
 							sx={{
 								display: 'flex',
-								justifyContent: 'center',
+								flexDirection: 'column',
 								alignItems: 'center',
+								justifyContent: 'center',
 								width: '100%',
 								gap: '1rem',
-								mt: '1.5rem',
 							}}
 						>
-							<Button variant="contained" onClick={handleUploadConfirm}>
-								Confirm
-							</Button>
-							<Button variant="contained" color="error" onClick={handleCancelClick}>
-								Cancel
-							</Button>
+							<Typography
+								variant="body1"
+								component="p"
+								sx={{
+									color: theme.palette.primary.main,
+									fontWeight: 'bold',
+									mt: '1.5rem',
+									fontSize: '1.2rem',
+								}}
+							>
+								Uploading...
+							</Typography>
+							<List
+								sx={{
+									maxHeight: '10rem',
+									overflowY: 'auto',
+									overflowX: 'hidden',
+									border: `1px solid ${theme.palette.primary.main}`,
+									borderRadius: '0.5rem',
+									padding: '0.5rem',
+								}}
+							>
+								{filesUploading.map(file => (
+									<ListItem
+										key={file}
+										sx={{
+											display: 'flex',
+											alignItems: 'center',
+											gap: '0.5rem',
+											padding: '0.5rem',
+											borderBottom: `1px solid ${theme.palette.primary.main}`,
+											'&:last-child': {
+												borderBottom: 'none',
+											},
+										}}
+									>
+										<Typography
+											variant="body1"
+											component="p"
+											sx={{
+												fontSize: '0.9rem',
+											}}
+										>
+											{file}
+										</Typography>
+									</ListItem>
+								))}
+							</List>
 						</Box>
+					) : (
+						<>
+							<Box
+								sx={{
+									display: 'flex',
+									flexDirection: 'column',
+									alignItems: 'center',
+									justifyContent: 'center',
+									width: '100%',
+									gap: '1rem',
+								}}
+							>
+								<Typography
+									variant="body1"
+									component="p"
+									sx={{
+										color: theme.palette.primary.main,
+										fontWeight: 'bold',
+										mt: '1rem',
+										textAlign: 'center',
+										fontSize: '1.2rem',
+									}}
+								>
+									Selected files:
+								</Typography>
+								<List
+									sx={{
+										maxHeight: '10rem',
+										overflowY: 'auto',
+										overflowX: 'hidden',
+										border: `1px solid ${theme.palette.primary.main}`,
+										borderRadius: '0.5rem',
+										padding: '0.5rem',
+									}}
+								>
+									{Array.from(files).map(file => (
+										<Box
+											sx={{
+												display: 'flex',
+												alignItems: 'center',
+												gap: '0.5rem',
+												padding: '0.5rem',
+												borderBottom: `1px solid ${theme.palette.primary.main}`,
+												'&:last-child': {
+													borderBottom: 'none',
+												},
+											}}
+											key={file.name}
+										>
+											<IconButton
+												aria-label="delete"
+												onClick={() => {
+													const dataTransfer = new DataTransfer()
+													const newFiles = Array.from(files).filter(f => f.name !== file.name)
+													newFiles.forEach(f => dataTransfer.items.add(f))
+													const fileList = dataTransfer.files
+													setFiles(newFiles.length > 0 ? fileList : null)
+													if (fileInputRef.current) fileInputRef.current.files = fileList
+												}}
+											>
+												<Delete
+													sx={{
+														color: theme.palette.error.main,
+													}}
+													fontSize="small"
+												/>
+											</IconButton>
+											<Typography
+												variant="body1"
+												component="p"
+												sx={{
+													fontSize: '0.9rem',
+												}}
+											>
+												{file.name}
+											</Typography>
+										</Box>
+									))}
+								</List>
+							</Box>
+							<Box
+								sx={{
+									display: 'flex',
+									justifyContent: 'center',
+									alignItems: 'center',
+									width: '100%',
+									gap: '1rem',
+									mt: '1.5rem',
+								}}
+							>
+								<Button variant="contained" onClick={handleUploadConfirm}>
+									Confirm
+								</Button>
+								<Button variant="contained" color="error" onClick={handleCancelClick}>
+									Cancel
+								</Button>
+							</Box>
+						</>
 					)}
 				</>
 			) : (

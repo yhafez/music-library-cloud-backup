@@ -1,18 +1,18 @@
-import { QueryResult } from 'pg'
+import pg from 'pg'
 
-import type { Song } from '../../../types'
 import { query } from '../../db'
 import handleDbError from './handleDbError'
 import { AppError } from '../../middleware/error-handler'
 
-const commitTransaction = async (): Promise<QueryResult<Song> | AppError> => {
+const commitTransaction = async (client: pg.Client): Promise<null | AppError> => {
 	try {
-		const result = await query('COMMIT')
-		if (!result) return handleDbError(new AppError(`Failed to commit transaction`, 500))
-		return result
+		await query({text: 'COMMIT', client});
+		return null;
 	} catch (err) {
-		return handleDbError(new AppError(`Failed to commit transaction`, 500, err))
+		return handleDbError(new AppError(`Failed to commit transaction`, 500, err));
+	} finally {
+		client.end();
 	}
-}
+  };
 
 export default commitTransaction

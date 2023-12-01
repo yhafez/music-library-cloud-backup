@@ -5,7 +5,7 @@ import loadSqlQuery from './loadSqlQuery'
 // Check if the file already exists in the database
 export const getFileByName = async function (fileName: string) {
 	try {
-		const dbCheckResult = await query(loadSqlQuery('select-song-by-name.sql'), [fileName])
+		const dbCheckResult = await query({text: loadSqlQuery('select-song-by-name.sql'), params: [fileName]})
 		if (dbCheckResult?.rows && dbCheckResult?.rows.length > 0) {
 			return new AppError('File already exists in database.', 409)
 		}
@@ -18,7 +18,7 @@ export const getFileByName = async function (fileName: string) {
 
 export const getFileById = async function (id: string) {
 	try {
-		const dbCheckResult = await query(loadSqlQuery('select-song-by-id.sql'), [id])
+		const dbCheckResult = await query({text: loadSqlQuery('select-song-by-id.sql'), params: [id]})
 		if (dbCheckResult?.rows && dbCheckResult?.rows.length === 0) {
 			return new AppError('File does not exist in database.', 409)
 		}

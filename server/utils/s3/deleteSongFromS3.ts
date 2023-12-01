@@ -16,15 +16,17 @@ const deleteSongFromS3 = async (id: string): Promise<DeleteObjectCommandOutput |
 	const fileDoesNotExistError = await getFileById(id)
 	if (fileDoesNotExistError instanceof AppError) return handleS3Error(fileDoesNotExistError)
 
-	await beginTransaction()
+	const client = await beginTransaction()
+	if (client instanceof AppError)
+		return handleDbError(new AppError(`Failed to begin transaction`, 500))
 	try {
 		const dbResult = deleteFileFromDb(id)
 		if (dbResult instanceof AppError) {
-			await rollbackTransaction()
+			await rollbackTransaction(client)
 			return handleDbError(dbResult)
 		}
 	} catch (err) {
-		await rollbackTransaction()
+		await rollbackTransaction(client)
 		return handleDbError(new AppError(`Failed to delete song from database`, 500, err))
 	}
 
@@ -35,15 +37,15 @@ const deleteSongFromS3 = async (id: string): Promise<DeleteObjectCommandOutput |
 	try {
 		const s3Result = await s3.send(command)
 		if (s3Result.$metadata.httpStatusCode !== 204) {
-			await rollbackTransaction()
+			await rollbackTransaction(client)
 			return handleS3Error(
 				new AppError(`Failed to delete object from S3`, s3Result.$metadata.httpStatusCode),
 			)
 		}
-		await commitTransaction()
+		await commitTransaction(client)
 		return s3Result
 	} catch (err) {
-		await rollbackTransaction()
+		await rollbackTransaction(client)
 		return handleS3Error(new AppError(`Failed to delete object from S3`, 500, err))
 	}
 }

@@ -25,11 +25,10 @@ const uploadFileFromS3ToDb = async (id: string): Promise<QueryResult<Song> | App
 
 	try {
 		console.log({ id })
-		const dbResult = await query(loadSqlQuery('insert-song-with-id.sql'), [
-			metadata.filename,
-			metadata,
-			id,
-		])
+		const dbResult = await query({
+			text: loadSqlQuery('insert-song-with-id.sql'),
+			params: [metadata.filename, metadata, id],
+		})
 		if (dbResult?.rowCount !== 1)
 			return handleDbError(new AppError(`Failed to save song with id ${id} to database`, 500))
 

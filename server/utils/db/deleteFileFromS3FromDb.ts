@@ -8,7 +8,7 @@ import { AppError } from '../../middleware/error-handler'
 
 const deleteFileFromS3FromDb = async (id: number): Promise<QueryResult<Song> | AppError> => {
 	try {
-		const dbResult = await query(loadSqlQuery('delete-song.sql'), [id])
+		const dbResult = await query({ text: loadSqlQuery('delete-song.sql'), params: [id] })
 		if (dbResult?.rowCount !== 1)
 			return handleDbError(new AppError(`Failed to delete song from database`, 500))
 

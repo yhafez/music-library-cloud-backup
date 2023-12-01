@@ -1,17 +1,18 @@
-import { QueryResult } from 'pg'
+import pg from 'pg'
 
-import type { Song } from '../../../types'
 import { query } from '../../db'
 import handleDbError from './handleDbError'
 import { AppError } from '../../middleware/error-handler'
 
-const rollbackTransaction = async (): Promise<QueryResult<Song> | AppError> => {
+const rollbackTransaction = async (client: pg.Client): Promise<null | AppError> => {
 	try {
-		const result = await query('ROLLBACK')
+		const result = await query({ text: 'ROLLBACK', client })
 		if (!result) return handleDbError(new AppError(`Failed to rollback transaction`, 500))
-		return result
+		return null
 	} catch (err) {
 		return handleDbError(new AppError(`Failed to rollback transaction`, 500, err))
+	} finally {
+		client.end()
 	}
 }
 

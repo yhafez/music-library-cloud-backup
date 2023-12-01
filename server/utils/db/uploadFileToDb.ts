@@ -38,7 +38,10 @@ const uploadFileToDb = async ({
 	}
 
 	try {
-		const dbResult = await query(loadSqlQuery('insert-song.sql'), [fileName, metadataResults])
+		const dbResult = await query({
+			text: loadSqlQuery('insert-song.sql'),
+			params: [fileName, metadataResults],
+		})
 		if (dbResult?.rowCount !== 1)
 			return handleDbError(new AppError(`Failed to save song to database`, 500))
 

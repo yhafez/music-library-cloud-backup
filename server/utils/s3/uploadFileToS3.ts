@@ -32,16 +32,18 @@ const uploadFileToS3 = async (
 		return handleS3Error(new AppError(`Failed to parse metadata`, 500, err))
 	}
 
-	await beginTransaction()
+	const client = await beginTransaction()
+	if (client instanceof AppError)
+		return handleDbError(new AppError(`Failed to begin transaction`, 500))
 	let dbResult: QueryResult<Song> | AppError
 	try {
 		dbResult = await uploadFileToDb({ fileName, metadata })
 		if (dbResult instanceof AppError) {
-			await rollbackTransaction()
+			await rollbackTransaction(client)
 			return handleDbError(dbResult)
 		}
 	} catch (err) {
-		await rollbackTransaction()
+		await rollbackTransaction(client)
 		return handleDbError(new AppError(`Failed to save song to database`, 500, err))
 	}
 
@@ -55,15 +57,15 @@ const uploadFileToS3 = async (
 	try {
 		const result = await s3.send(command)
 		if (result.$metadata.httpStatusCode !== 200) {
-			await rollbackTransaction()
+			await rollbackTransaction(client)
 			return handleS3Error(
 				new AppError(`Failed to upload file to S3`, result.$metadata.httpStatusCode),
 			)
 		}
-		await commitTransaction()
+		await commitTransaction(client)
 		return result
 	} catch (err) {
-		await rollbackTransaction()
+		await rollbackTransaction(client)
 		return handleS3Error(new AppError(`Failed to upload file to S3`, 500, err))
 	}
 }

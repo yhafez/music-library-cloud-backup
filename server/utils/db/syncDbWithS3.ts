@@ -32,7 +32,6 @@ const syncDbWithS3 = async (): Promise<
 	const s3SongIds =
 		(s3Result.Contents?.map(object => object.Key).filter(key => key !== undefined) as string[]) ??
 		[]
-	console.log({ s3SongIds })
 
 	const songsToAdd = s3SongIds.filter(id => !dbSongIds.includes(+id))
 	const songsToDelete = dbSongIds.filter(id => !s3SongIds.includes(id.toString()))

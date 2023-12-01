@@ -8,7 +8,7 @@ import { AppError } from '../../middleware/error-handler'
 
 const listFilesInDb = async (): Promise<QueryResult<Song> | AppError> => {
 	try {
-		const result = await query(loadSqlQuery('select-songs.sql'))
+		const result = await query({ text: loadSqlQuery('select-songs.sql') })
 		if (!result) return handleDbError(new AppError(`Failed to retrieve songs from database`, 500))
 		return result
 	} catch (err) {
